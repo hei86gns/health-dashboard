@@ -85,4 +85,25 @@ create policy "allow select for anon"
 ## 未解決・要検討事項
 - Health Auto ExportのPremium(年額1000円)にするか、Basic買い切り(500円)+手動送信にするか
   → 手動の場合、送信のたびに日付範囲を広めに取り、UPSERTで穴埋めする運用
-- 実際のJSON構造確認後、`raw`列からの指標抽出ロジック(トリガー関数 or アプリ側で整形)を決定
+
+## 2026/07/19 JSON構造確認済み・設計確定
+
+webhook.site への試験送信で実構造を確認した(サンプル: `docs/sample-payload.json`)。
+
+```json
+{ "data": { "metrics": [
+    { "name": "step_count", "units": "count",
+      "data": [ { "date": "2026-07-13 01:12:00 +0900", "qty": 12.73, "source": "..." } ] }
+] } }
+```
+
+判明したこと・決定事項:
+- **入れ子構造のためテーブル直POSTは不可**(PostgRESTは列名一致のフラットJSONのみ受付)
+  → 受け口として **RPC関数 `ingest_health(data jsonb)`** を採用(`sql/01_health_metrics.sql`)
+  - 送信先URL: `https://<プロジェクトID>.supabase.co/rest/v1/rpc/ingest_health`
+  - 関数内で日次に集計してUPSERTするため `Prefer: resolution=merge-duplicates` ヘッダーは**不要**
+  - 必要ヘッダーは `apikey` / `Authorization: Bearer <Anon Key>` / `Content-Type: application/json` の3つ
+- **デフォルトでは1分刻みのデータが送られる**(7日分で約2,000点)
+  → アプリ側の集計間隔を「日」に変更するのを推奨(関数側でも日次集計するため必須ではない)
+- 集計ルール: 加算が意味を持つ単位(count, km, kcal等)は日次合計、それ以外(心拍数等)は日次平均
+- 日付は文字列先頭10文字から取得(timestamptz経由だとUTC換算で日付がずれるため)

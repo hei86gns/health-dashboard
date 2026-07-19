@@ -1,0 +1,37 @@
+{
+  "data": {
+    "metrics": [
+      {
+        "name": "step_count",
+        "units": "count",
+        "data": [
+          {
+            "source": "GuinnessさんのApple Watch",
+            "date": "2026-07-13 01:12:00 +0900",
+            "qty": 12.735582449267699
+          },
+          {
+            "date": "2026-07-13 01:13:00 +0900",
+            "source": "GuinnessさんのApple Watch",
+            "qty": 13.279151537476222
+          },
+          {
+            "source": "GuinnessさんのApple Watch",
+            "date": "2026-07-13 01:14:00 +0900",
+            "qty": 11.383691005178417
+          },
+          {
+            "qty": 11.383691005178417,
+            "date": "2026-07-13 01:15:00 +0900",
+            "source": "GuinnessさんのApple Watch"
+          },
+          {
+            "source": "GuinnessさんのApple Watch",
+            "qty": 2.2178840028992468,
+            "date": "2026-07-13 01:16:00 +0900"
+          }
+        ]
+      }
+    ]
+  }
+}
