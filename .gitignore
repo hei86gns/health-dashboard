@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+
+# 秘密情報(SupabaseのURL・Anon Keyなどはここに置く)
+.env
+.env.*
+
+# エディタ
+.vscode/
+.idea/
