@@ -121,6 +121,7 @@ input, select { font-family: inherit; font-size: 1rem; }
     <h1>健康ダッシュボード</h1>
     <button id="logout-btn" class="btn-ghost">ログアウト</button>
   </div>
+  <div style="font-size:.78rem; color:var(--text-sub); padding:0 2px 10px;">ログイン中: <span id="login-email-display">—</span></div>
 
   <div class="card freshness">
     <div>
@@ -165,7 +166,11 @@ const METRIC_LABELS = {
 };
 
 const $ = (sel) => document.querySelector(sel);
-const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+// storageKeyを指定し、同じブラウザ内の他アプリ(Kakeibo等)とログインセッションが
+// 混ざらないようにする(同じSupabaseプロジェクト・同じGitHub Pagesオリジンを使うため)
+const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+  auth: { storageKey: 'health-dashboard-auth' },
+});
 
 let chart = null;
 
@@ -249,6 +254,8 @@ sb.auth.onAuthStateChange((event, session) => {
  * ============================================================ */
 async function startApp() {
   showView('dashboard');
+  const { data: { user } } = await sb.auth.getUser();
+  $('#login-email-display').textContent = user?.email || '不明';
   await loadMetricOptions();
 }
 
