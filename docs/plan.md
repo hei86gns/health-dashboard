@@ -97,10 +97,17 @@ create policy "allow select for anon"
   Authentication → Users → Add user で本人のアカウントを1つ手動作成する運用
 - **見た目**: Kakeiboではなくギネス家ポータルのCSS変数・カードUIをそのまま流用
   (`--brand:#1a5c4a` 等)。同じ家族エコシステムの一員として統一感を出す
-- **アクセス制限**: `sql/02_restrict_select_to_authenticated.sql` でSELECTを
-  authenticatedロール限定に変更。INSERT/UPDATEはanonのまま(iPhoneからの自動送信を止めないため)。
+- **アクセス制限**: `sql/02_per_user_data.sql` でSELECTを「自分の行だけ」に制限。
+  INSERT/UPDATEはanonのまま(iPhoneからの自動送信を止めないため)。
   台帳にも記載されていた「health_metricsがanonキーで読み書き可能なまま」という
   既知の課題をここで解消
+- **家族の個人データ分離(2026/07/25 追加検討)**: 家族3人が将来それぞれ自分のiPhoneから
+  送信する可能性を見据え、`health_metrics`に`user_id`列を追加しRLSで
+  `auth.uid() = user_id`の行だけ見える設計に変更。ログイン中の人は自分のデータしか見えない。
+  Health Auto Exportはアプリ側でJSON本文をカスタマイズできない制約があるため、
+  「誰のデータか」は**送信先URLで区別**する(1人目は`ingest_health`のまま変更不要、
+  2人目以降は`ingest_health_2`のような別関数を追加してURLを分ける)。
+  現時点では自分のデータのみ運用、2人目以降の追加はSQLファイル末尾にひな形コメントとして記載
 - **GitHub/公開**: Kakeiboと同じくポータルとは別の専用リポジトリを新規作成し、
   Publicのまま無料でGitHub Pages公開(非公開リポジトリでのPagesは有料プランが必要なため)。
   鍵(Anon Key)はコードに埋め込むが、公開されて良い前提のもの。実データの保護はRLS+ログインで担保
