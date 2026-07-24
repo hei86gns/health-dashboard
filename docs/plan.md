@@ -108,6 +108,9 @@ create policy "allow select for anon"
   「誰のデータか」は**送信先URLで区別**する(1人目は`ingest_health`のまま変更不要、
   2人目以降は`ingest_health_2`のような別関数を追加してURLを分ける)。
   現時点では自分のデータのみ運用、2人目以降の追加はSQLファイル末尾にひな形コメントとして記載
+- **不具合修正**: `ingest_health`が`security invoker`のままだったため、iPhone(anon権限)から
+  `auth.users`を読もうとして`permission denied`で失敗。`sql/03_fix_ingest_permission.sql`で
+  `security definer`に変更して解消(anonロール自体には追加権限を与えない、関数だけの特例)
 - **GitHub/公開**: Kakeiboと同じくポータルとは別の専用リポジトリを新規作成し、
   Publicのまま無料でGitHub Pages公開(非公開リポジトリでのPagesは有料プランが必要なため)。
   鍵(Anon Key)はコードに埋め込むが、公開されて良い前提のもの。実データの保護はRLS+ログインで担保
