@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1a5c4a">
+<title>健康ダッシュボード</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+:root {
+  --brand: #1a5c4a;
+  --brand-light: #e6f2ee;
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --text: #1f2937;
+  --text-sub: #6b7280;
+  --line: #e5e7eb;
+  --danger: #dc2626;
+  --warn: #ea580c;
+  --ok: #16a34a;
+  --radius: 14px;
+  --shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { font-size: 16px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  background: var(--bg); color: var(--text);
+  padding-top: max(env(safe-area-inset-top), 0px);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+button { font-family: inherit; font-size: 1rem; border: none; background: none; cursor: pointer; color: inherit; }
+input, select { font-family: inherit; font-size: 1rem; }
+
+.view { display: none; max-width: 560px; margin: 0 auto; padding: 12px 14px 24px; }
+.view.active { display: block; }
+.view-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 2px 14px; }
+.view-header h1 { font-size: 1.25rem; font-weight: 700; }
+.card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; margin-bottom: 12px; }
+.btn-primary { background: var(--brand); color: #fff; border-radius: 10px; padding: 12px 18px; font-weight: 700; width: 100%; }
+.btn-primary:disabled { opacity: .4; }
+.btn-ghost { color: var(--brand); font-weight: 600; padding: 8px 10px; }
+
+/* ---------- エラーバナー ---------- */
+#err-banner { display: none; background: #fee2e2; color: #991b1b; font-size: .82rem; padding: 10px 14px; text-align: center; }
+#err-banner.show { display: block; }
+
+/* ---------- ログイン ---------- */
+#view-login { display: none; min-height: 100vh; padding-top: 18vh; text-align: center; }
+#view-login.active { display: block; }
+.login-logo { font-size: 3rem; }
+.login-title { font-size: 1.4rem; font-weight: 800; color: var(--brand); margin: 8px 0 28px; }
+.login-field {
+  width: 100%; max-width: 300px; padding: 13px 16px; border: 1.5px solid var(--line);
+  border-radius: 12px; background: var(--card); margin: 0 auto 10px; display: block;
+}
+.login-field:focus { outline: none; border-color: var(--brand); }
+#login-btn { max-width: 300px; margin-top: 6px; }
+#login-err { color: var(--danger); font-size: .85rem; margin-top: 12px; min-height: 1.2em; }
+#login-reset-link { color: var(--text-sub); font-size: .82rem; margin-top: 16px; text-decoration: underline; }
+#login-reset-msg { color: var(--ok); font-size: .88rem; max-width: 300px; margin: 0 auto; line-height: 1.6; }
+
+/* ---------- ダッシュボード ---------- */
+.freshness { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.freshness .label { font-size: .78rem; color: var(--text-sub); }
+.freshness .date { font-size: 1.15rem; font-weight: 700; margin-top: 2px; }
+.freshness .chip { font-size: .75rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.freshness .chip.ok { background: var(--brand-light); color: var(--brand); }
+.freshness .chip.warn { background: #fef3c7; color: #92400e; }
+.freshness .chip.danger { background: #fee2e2; color: var(--danger); }
+
+.metric-select {
+  width: 100%; padding: 11px 12px; border: 1.5px solid var(--line); border-radius: 12px;
+  background: var(--card); -webkit-appearance: none; appearance: none;
+}
+
+.stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
+.stat-cell { background: var(--card); padding: 12px 14px; }
+.stat-num { font-size: 1.3rem; font-weight: 700; color: var(--brand); }
+.stat-label { font-size: .72rem; color: var(--text-sub); margin-top: 2px; }
+
+.chart-wrap { position: relative; height: 240px; }
+.empty { text-align: center; color: var(--text-sub); padding: 24px 0; font-size: .9rem; }
+</style>
+</head>
+<body>
+
+<div id="err-banner"></div>
+
+<!-- ログイン -->
+<div id="view-login" class="view">
+  <div class="login-logo">🩺</div>
+  <div class="login-title">健康ダッシュボード</div>
+
+  <div id="login-form">
+    <input id="login-email" type="email" class="login-field" placeholder="メールアドレス" autocomplete="email">
+    <input id="login-pass" type="password" class="login-field" placeholder="パスワード" autocomplete="current-password">
+    <button id="login-btn" class="btn-primary">ログイン</button>
+    <div id="login-err"></div>
+    <button id="login-reset-link">パスワードを忘れた場合はこちら</button>
+  </div>
+
+  <div id="login-reset-msg" style="display:none">
+    パスワードリセットのメールを送信しました。<br>メールを確認してください。
+  </div>
+
+  <!-- パスワード再設定メールのリンクから戻ってきたときだけ表示 -->
+  <div id="recovery-form" style="display:none; margin-top: 20px;">
+    <input id="recovery-pass" type="password" class="login-field" placeholder="新しいパスワード" autocomplete="new-password">
+    <button id="recovery-btn" class="btn-primary">パスワードを更新</button>
+    <div id="recovery-err" style="color:var(--danger); font-size:.85rem; margin-top:12px; min-height:1.2em;"></div>
+  </div>
+</div>
+
+<!-- ダッシュボード -->
+<div id="view-dashboard" class="view">
+  <div class="view-header">
+    <h1>健康ダッシュボード</h1>
+    <button id="logout-btn" class="btn-ghost">ログアウト</button>
+  </div>
+
+  <div class="card freshness">
+    <div>
+      <div class="label">最終データ日</div>
+      <div class="date" id="last-date">—</div>
+    </div>
+    <div class="chip ok" id="freshness-chip">—</div>
+  </div>
+
+  <div class="card">
+    <select id="metric-select" class="metric-select"></select>
+  </div>
+
+  <div class="stats-row" id="stats-row" style="display:none">
+    <div class="stat-cell">
+      <div class="stat-num" id="stat-sum">—</div>
+      <div class="stat-label" id="stat-sum-label">合計</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num" id="stat-avg">—</div>
+      <div class="stat-label">1日あたり平均</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chart-wrap"><canvas id="chart"></canvas></div>
+    <div class="empty" id="chart-empty" style="display:none">まだデータがありません</div>
+  </div>
+</div>
+
+<script>
+const CONFIG = {
+  SUPABASE_URL: 'https://zkqvqztadbzqwdwqhyjw.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InprcXZxenRhZGJ6cXdkd3FoeWp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MzYwNTUsImV4cCI6MjA5ODExMjA1NX0.qUEUX7Csd5mK4qPciGE-Zc_6TY_3888Faewkv99uFqU',
+};
+// 最終データ日からこの日数を超えて更新がなければ警告表示
+const STALE_WARN_DAYS = 2;
+const STALE_DANGER_DAYS = 5;
+// metric_name → 表示名・単位ラベル
+const METRIC_LABELS = {
+  step_count: { name: '歩数', unit: '歩' },
+};
+
+const $ = (sel) => document.querySelector(sel);
+const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+
+let chart = null;
+
+/* ---------- エラー表示 ---------- */
+function showErr(msg) {
+  const b = $('#err-banner');
+  b.textContent = msg;
+  b.classList.add('show');
+  setTimeout(() => b.classList.remove('show'), 6000);
+}
+
+/* ---------- 画面切り替え ---------- */
+function showView(name) {
+  document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
+  $(`#view-${name}`).classList.add('active');
+}
+
+/* ============================================================
+ * 認証
+ * ============================================================ */
+async function tryLogin() {
+  const email = $('#login-email').value.trim();
+  const pass = $('#login-pass').value;
+  if (!email || !pass) return;
+  $('#login-btn').disabled = true;
+  $('#login-err').textContent = '';
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  $('#login-btn').disabled = false;
+  if (error) {
+    $('#login-err').textContent = 'メールアドレスまたはパスワードが正しくありません。';
+    return;
+  }
+  startApp();
+}
+
+async function tryResetPassword() {
+  const email = $('#login-email').value.trim();
+  if (!email) {
+    $('#login-err').textContent = 'メールアドレスを入力してからリセットしてください。';
+    return;
+  }
+  await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.href.split('#')[0] });
+  $('#login-form').style.display = 'none';
+  $('#login-reset-msg').style.display = 'block';
+}
+
+async function tryUpdatePassword() {
+  const pass = $('#recovery-pass').value;
+  if (!pass) return;
+  $('#recovery-btn').disabled = true;
+  const { error } = await sb.auth.updateUser({ password: pass });
+  $('#recovery-btn').disabled = false;
+  if (error) {
+    $('#recovery-err').textContent = '更新に失敗しました。もう一度お試しください。';
+    return;
+  }
+  startApp();
+}
+
+$('#login-btn').addEventListener('click', tryLogin);
+$('#login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryLogin(); });
+$('#login-email').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryLogin(); });
+$('#login-reset-link').addEventListener('click', tryResetPassword);
+$('#recovery-btn').addEventListener('click', tryUpdatePassword);
+$('#logout-btn').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  showView('login');
+});
+
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    $('#login-form').style.display = 'none';
+    $('#login-reset-msg').style.display = 'none';
+    $('#recovery-form').style.display = 'block';
+    showView('login');
+  }
+});
+
+/* ============================================================
+ * ダッシュボード
+ * ============================================================ */
+async function startApp() {
+  showView('dashboard');
+  await loadMetricOptions();
+}
+
+async function loadMetricOptions() {
+  const { data, error } = await sb.from('health_metrics').select('metric_name').order('metric_name');
+  if (error) { showErr('指標一覧の取得に失敗しました（' + error.message + '）'); return; }
+
+  const names = [...new Set((data || []).map((r) => r.metric_name))];
+  const sel = $('#metric-select');
+  sel.innerHTML = '';
+  if (names.length === 0) {
+    sel.innerHTML = '<option>データがまだありません</option>';
+    renderChart([]);
+    return;
+  }
+  for (const n of names) {
+    const opt = document.createElement('option');
+    opt.value = n;
+    opt.textContent = METRIC_LABELS[n]?.name || n;
+    sel.appendChild(opt);
+  }
+  sel.addEventListener('change', () => loadMetricData(sel.value));
+  await loadMetricData(names[0]);
+}
+
+async function loadMetricData(metricName) {
+  const { data, error } = await sb
+    .from('health_metrics')
+    .select('recorded_date,value')
+    .eq('metric_name', metricName)
+    .order('recorded_date', { ascending: false })
+    .limit(30);
+  if (error) { showErr('データの取得に失敗しました（' + error.message + '）'); return; }
+
+  const rows = (data || []).slice().reverse(); // 古い→新しい順に並べ替え
+  updateFreshness(rows);
+  updateStats(rows, metricName);
+  renderChart(rows, metricName);
+}
+
+function updateFreshness(rows) {
+  const chip = $('#freshness-chip');
+  if (rows.length === 0) {
+    $('#last-date').textContent = 'データなし';
+    chip.textContent = '—';
+    chip.className = 'chip warn';
+    return;
+  }
+  const lastDate = rows[rows.length - 1].recorded_date;
+  $('#last-date').textContent = lastDate;
+
+  const diffDays = Math.floor((Date.now() - new Date(lastDate + 'T00:00:00').getTime()) / 86400000);
+  if (diffDays >= STALE_DANGER_DAYS) {
+    chip.textContent = `${diffDays}日更新なし`;
+    chip.className = 'chip danger';
+  } else if (diffDays >= STALE_WARN_DAYS) {
+    chip.textContent = `${diffDays}日更新なし`;
+    chip.className = 'chip warn';
+  } else {
+    chip.textContent = '最新';
+    chip.className = 'chip ok';
+  }
+}
+
+function updateStats(rows, metricName) {
+  const row = $('#stats-row');
+  if (rows.length === 0) { row.style.display = 'none'; return; }
+  row.style.display = 'grid';
+
+  const unit = METRIC_LABELS[metricName]?.unit || '';
+  const sum = rows.reduce((a, r) => a + (r.value || 0), 0);
+  const avg = sum / rows.length;
+
+  $('#stat-sum').textContent = Math.round(sum).toLocaleString() + unit;
+  $('#stat-sum-label').textContent = `直近${rows.length}日合計`;
+  $('#stat-avg').textContent = Math.round(avg).toLocaleString() + unit;
+}
+
+function renderChart(rows, metricName) {
+  const empty = $('#chart-empty');
+  const canvas = $('#chart');
+  if (rows.length === 0) {
+    empty.style.display = 'block';
+    canvas.style.display = 'none';
+    if (chart) { chart.destroy(); chart = null; }
+    return;
+  }
+  empty.style.display = 'none';
+  canvas.style.display = 'block';
+
+  const labels = rows.map((r) => r.recorded_date.slice(5)); // MM-DD
+  const values = rows.map((r) => r.value);
+  const label = METRIC_LABELS[metricName]?.name || metricName;
+
+  if (chart) chart.destroy();
+  chart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label,
+        data: values,
+        backgroundColor: '#1a5c4a',
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+}
+
+/* ============================================================
+ * 起動処理
+ * ============================================================ */
+(async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    startApp();
+  } else {
+    showView('login');
+  }
+})();
+</script>
+
+</body>
+</html>

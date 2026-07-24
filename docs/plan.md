@@ -86,6 +86,26 @@ create policy "allow select for anon"
 - Health Auto ExportのPremium(年額1000円)にするか、Basic買い切り(500円)+手動送信にするか
   → 手動の場合、送信のたびに日付範囲を広めに取り、UPSERTで穴埋めする運用
 
+## 2026/07/25 ダッシュボード(index.html)作成・Kakeibo型で公開へ
+
+「マイアプリ台帳」Artifactで家の全アプリ構成を棚卸しした結果、Kakeibo_Appが
+「Supabaseプロジェクトはポータルと共有しつつ、ログインとコードは独立」の先例
+だと判明したため、この構成をそのまま踏襲することに決定。
+
+- **ログイン**: ポータルの家族合言葉方式ではなく、Kakeiboと同じメール+パスワード
+  (Supabase標準認証)。セルフ登録フォームは作らず、Supabase Dashboardの
+  Authentication → Users → Add user で本人のアカウントを1つ手動作成する運用
+- **見た目**: Kakeiboではなくギネス家ポータルのCSS変数・カードUIをそのまま流用
+  (`--brand:#1a5c4a` 等)。同じ家族エコシステムの一員として統一感を出す
+- **アクセス制限**: `sql/02_restrict_select_to_authenticated.sql` でSELECTを
+  authenticatedロール限定に変更。INSERT/UPDATEはanonのまま(iPhoneからの自動送信を止めないため)。
+  台帳にも記載されていた「health_metricsがanonキーで読み書き可能なまま」という
+  既知の課題をここで解消
+- **GitHub/公開**: Kakeiboと同じくポータルとは別の専用リポジトリを新規作成し、
+  Publicのまま無料でGitHub Pages公開(非公開リポジトリでのPagesは有料プランが必要なため)。
+  鍵(Anon Key)はコードに埋め込むが、公開されて良い前提のもの。実データの保護はRLS+ログインで担保
+- 構成: index.html(単一ファイル、Chart.js CDN)。最終データ日から2日で警告・5日で危険表示
+
 ## 2026/07/19 夜: パイプライン開通 ✅
 
 iPhoneのHealth Auto Exportから本番URL(RPC)への送信に成功し、7日分がUPSERTされた。
