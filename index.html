@@ -84,6 +84,14 @@ input, select { font-family: inherit; font-size: 1rem; }
 
 .chart-wrap { position: relative; height: 240px; }
 .empty { text-align: center; color: var(--text-sub); padding: 24px 0; font-size: .9rem; }
+
+.insight-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; font-size: .88rem; }
+.insight-item + .insight-item { border-top: 1px solid var(--line); }
+.insight-item .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); margin-top: 6px; flex-shrink: 0; }
+.insight-item .txt b { color: var(--text); }
+.insight-item .txt .sub { color: var(--text-sub); font-size: .78rem; }
+.insight-calm { color: var(--ok); font-size: .88rem; }
+.insight-empty { color: var(--text-sub); font-size: .85rem; }
 </style>
 </head>
 <body>
@@ -129,6 +137,14 @@ input, select { font-family: inherit; font-size: 1rem; }
       <div class="date" id="last-date">—</div>
     </div>
     <div class="chip ok" id="freshness-chip">—</div>
+  </div>
+
+  <div class="card" id="insights-card" style="display:none">
+    <div class="label" style="margin-bottom:8px;">注目ポイント</div>
+    <div id="insights-body"></div>
+    <div style="font-size:.7rem; color:var(--text-sub); margin-top:10px; line-height:1.5;">
+      体調の目安であり、診断ではありません。気になる場合は医療機関へご相談ください。
+    </div>
   </div>
 
   <div class="card">
@@ -179,6 +195,23 @@ const METRIC_LABELS = {
   sleep_rem: { name: '睡眠(REM)', unit: '時間' },
   sleep_awake: { name: '覚醒時間', unit: '時間' },
 };
+
+// 「注目ポイント」の対象指標。concern: 'low'=低下が気になる, 'high'=上昇が気になる
+const INSIGHT_METRICS = [
+  { name: 'step_count', concern: 'low' },
+  { name: 'resting_heart_rate', concern: 'high' },
+  { name: 'heart_rate_variability', concern: 'low' },
+  { name: 'walking_speed', concern: 'low' },
+  { name: 'walking_step_length', concern: 'low' },
+  { name: 'walking_asymmetry_percentage', concern: 'high' },
+  { name: 'walking_double_support_percentage', concern: 'high' },
+  { name: 'sleep_total', concern: 'low' },
+];
+const INSIGHT_BASELINE_DAYS = 40; // 何日前まで遡って取得するか
+const INSIGHT_RECENT_DAYS = 7;    // 「直近」とみなす日数
+const INSIGHT_MIN_BASELINE_POINTS = 5;
+const INSIGHT_MIN_RECENT_POINTS = 3;
+const INSIGHT_Z_THRESHOLD = 1.5;
 
 const $ = (sel) => document.querySelector(sel);
 // storageKeyを指定し、同じブラウザ内の他アプリ(Kakeibo等)とログインセッションが
@@ -272,7 +305,80 @@ async function startApp() {
   const { data: { user } } = await sb.auth.getUser();
   $('#login-email-display').textContent = user?.email || '不明';
   await loadMetricOptions();
+  await loadInsights();
 }
+
+/* ============================================================
+ * 注目ポイント(個人ベースラインからの逸脱検知)
+ * ============================================================ */
+function mean(arr) { return arr.reduce((a, b) => a + b, 0) / arr.length; }
+function stddev(arr, avg) {
+  const m = avg ?? mean(arr);
+  return Math.sqrt(arr.reduce((a, b) => a + (b - m) ** 2, 0) / arr.length);
+}
+
+async function loadInsights() {
+  const card = $('#insights-card');
+  const body = $('#insights-body');
+  const names = INSIGHT_METRICS.map((m) => m.name);
+  const since = new Date(Date.now() - INSIGHT_BASELINE_DAYS * 86400000).toISOString().slice(0, 10);
+
+  const { data, error } = await sb
+    .from('health_metrics')
+    .select('metric_name,recorded_date,value')
+    .in('metric_name', names)
+    .gte('recorded_date', since)
+    .order('recorded_date');
+  if (error) { showErr('注目ポイントの取得に失敗しました（' + error.message + '）'); return; }
+  if (!data || data.length === 0) { card.style.display = 'none'; return; }
+
+  const today = new Date();
+  const recentCutoff = new Date(today.getTime() - INSIGHT_RECENT_DAYS * 86400000);
+  const flags = [];
+  let anyComputed = false;
+
+  for (const cfg of INSIGHT_METRICS) {
+    const rows = data.filter((r) => r.metric_name === cfg.name && r.value !== null);
+    const baseline = rows.filter((r) => new Date(r.recorded_date) < recentCutoff).map((r) => r.value);
+    const recent = rows.filter((r) => new Date(r.recorded_date) >= recentCutoff).map((r) => r.value);
+    if (baseline.length < INSIGHT_MIN_BASELINE_POINTS || recent.length < INSIGHT_MIN_RECENT_POINTS) continue;
+
+    anyComputed = true;
+    const baseAvg = mean(baseline);
+    const baseStd = stddev(baseline, baseAvg);
+    const recentAvg = mean(recent);
+    if (baseStd === 0) continue;
+    const z = (recentAvg - baseAvg) / baseStd;
+
+    const flagged = (cfg.concern === 'high' && z >= INSIGHT_Z_THRESHOLD) ||
+                     (cfg.concern === 'low' && z <= -INSIGHT_Z_THRESHOLD);
+    if (flagged) {
+      const label = METRIC_LABELS[cfg.name]?.name || cfg.name;
+      const unit = METRIC_LABELS[cfg.name]?.unit || '';
+      const dir = cfg.concern === 'high' ? '高め' : '低め';
+      flags.push({
+        text: `${label}が直近${INSIGHT_RECENT_DAYS}日で普段より${dir}`,
+        sub: `普段 ${round1(baseAvg)}${unit} → 直近 ${round1(recentAvg)}${unit}`,
+      });
+    }
+  }
+
+  if (!anyComputed) { card.style.display = 'none'; return; }
+
+  card.style.display = 'block';
+  if (flags.length === 0) {
+    body.innerHTML = '<div class="insight-calm">特に気になる変化はありません</div>';
+  } else {
+    body.innerHTML = flags.map((f) => `
+      <div class="insight-item">
+        <div class="dot"></div>
+        <div class="txt"><b>${f.text}</b><br><span class="sub">${f.sub}</span></div>
+      </div>
+    `).join('');
+  }
+}
+
+function round1(n) { return Math.round(n * 10) / 10; }
 
 async function loadMetricOptions() {
   const { data, error } = await sb.from('health_metrics').select('metric_name').order('metric_name');
