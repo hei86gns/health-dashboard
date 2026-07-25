@@ -6,6 +6,7 @@
     <string>com.hei86gns.healthdashboard.uploader</string>
     <key>ProgramArguments</key>
     <array>
+        <string>/bin/bash</string>
         <string>/Users/nori_macbook_air/Desktop/HealthDashboard/scripts/upload_export.sh</string>
     </array>
     <key>WatchPaths</key>
