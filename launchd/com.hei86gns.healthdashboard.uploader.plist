@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hei86gns.healthdashboard.uploader</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/nori_macbook_air/Desktop/HealthDashboard/scripts/upload_export.sh</string>
+    </array>
+    <key>WatchPaths</key>
+    <array>
+        <string>/Users/nori_macbook_air/Downloads</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/nori_macbook_air/Desktop/HealthDashboard/inbox/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/nori_macbook_air/Desktop/HealthDashboard/inbox/launchd.err.log</string>
+</dict>
+</plist>

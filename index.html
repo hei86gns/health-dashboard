@@ -158,11 +158,26 @@ const CONFIG = {
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InprcXZxenRhZGJ6cXdkd3FoeWp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MzYwNTUsImV4cCI6MjA5ODExMjA1NX0.qUEUX7Csd5mK4qPciGE-Zc_6TY_3888Faewkv99uFqU',
 };
 // 最終データ日からこの日数を超えて更新がなければ警告表示
-const STALE_WARN_DAYS = 2;
-const STALE_DANGER_DAYS = 5;
+// Basicプラン+手動エクスポート運用のため、自動送信の頃より緩めに設定
+const STALE_WARN_DAYS = 4;
+const STALE_DANGER_DAYS = 10;
 // metric_name → 表示名・単位ラベル
 const METRIC_LABELS = {
   step_count: { name: '歩数', unit: '歩' },
+  heart_rate: { name: '心拍数(平均)', unit: 'bpm' },
+  heart_rate_min: { name: '心拍数(最小)', unit: 'bpm' },
+  heart_rate_max: { name: '心拍数(最大)', unit: 'bpm' },
+  resting_heart_rate: { name: '安静時心拍数', unit: 'bpm' },
+  heart_rate_variability: { name: '心拍変動(HRV)', unit: 'ms' },
+  walking_speed: { name: '歩行速度', unit: 'km/h' },
+  walking_asymmetry_percentage: { name: '歩行の非対称性', unit: '%' },
+  walking_step_length: { name: '歩行ステップの長さ', unit: 'cm' },
+  walking_double_support_percentage: { name: '歩行ダブルサポート割合', unit: '%' },
+  sleep_total: { name: '睡眠時間(合計)', unit: '時間' },
+  sleep_core: { name: '睡眠(コア)', unit: '時間' },
+  sleep_deep: { name: '睡眠(深い)', unit: '時間' },
+  sleep_rem: { name: '睡眠(REM)', unit: '時間' },
+  sleep_awake: { name: '覚醒時間', unit: '時間' },
 };
 
 const $ = (sel) => document.querySelector(sel);

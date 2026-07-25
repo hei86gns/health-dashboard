@@ -82,9 +82,49 @@ create policy "allow select for anon"
 - 「最終データ日」を表示し、○日以上更新がなければ警告表示
 - 既存のギネス家ポータル/Kakeiboと同じSupabaseプロジェクトを想定
 
+## 2026/07/25 Basicプラン決定 → REST API自動送信は使えないと判明、運用を再設計
+
+Health Auto ExportをBasic(買い切り)で購入したところ、**オートメーション機能自体が
+Premium専用**と判明(手動実行も含め、REST API送信はPremiumがないと一切使えない)。
+Basicの「手動」はファイルへの書き出し(AirDrop/メール等)のみで、直接のREST API送信は
+選択肢に無い。事前確認が不十分なまま勧めてしまった反省点。
+
+検討の結果、**Basicのまま+Macでの自動アップロード**を採用:
+
+```
+iPhone: 手動エクスポート(JSON、期間は広め) → AirDropでMacへ  ← ここだけ人手が必要
+Mac: launchd(WatchPaths)が~/Downloadsを監視 → 新しいJSONを検知
+     → scripts/upload_export.sh が内容を検証してingest_healthにPOST
+     → 成功したらinbox/processed/へ移動(重複防止・記録)
+```
+
+- iPhone側の「エクスポートを押す」操作自体はiOSの制約上どうしても自動化できないが、
+  それ以降(Mac側)は完全自動化できる
+- **運用ルール**: 手動エクスポートのたびに、期間は「過去60日」など広めに設定する。
+  同じ日のデータを再送しても`unique(recorded_date, metric_name, user_id)`のUPSERTで
+  安全に上書きされるだけなので、期間が重複しても問題ない
+- 関連ファイル: [scripts/upload_export.sh](../scripts/upload_export.sh)、
+  [launchd/com.hei86gns.healthdashboard.uploader.plist](../launchd/com.hei86gns.healthdashboard.uploader.plist)
+
+## 2026/07/25 新指標9種を追加(歩行系・心拍系・睡眠)
+
+実際のJSON構造を確認した結果、想定通り2つの指標だけ特殊な形をしていた
+(`sql/04_add_sleep_and_heartrate_ingest.sql`で対応済み):
+
+- **sleep_analysis**: `qty`を持たず、1晩ごとに`totalSleep/core/deep/rem/awake`等の
+  段階別時間(hr)を持つ構造 → `sleep_total`/`sleep_core`/`sleep_deep`/`sleep_rem`/
+  `sleep_awake`の5指標に分解して保存
+- **heart_rate**: `qty`ではなく`Avg`/`Min`/`Max`を持つ構造 → `heart_rate`(平均)/
+  `heart_rate_min`/`heart_rate_max`の3指標に分解して保存
+- それ以外(歩行速度・歩行の非対称性・歩行ステップの長さ・歩行ダブルサポート割合・
+  安静時心拍数・心拍変動)は歩数と同じ`{date, qty, source}`形式で、既存の汎用ロジック
+  (加算すべき単位は合計・それ以外は平均)がそのまま使えた
+- 「歩行の安定性(Walking Steadiness)」はHealth Auto Exportの選択肢に存在せず、
+  代わりに歩行ステップの長さ・歩行ダブルサポート割合を採用
+- 実データで1回テスト投入し、1,352行(91日分×各指標)が正しく取り込まれることを確認済み
+
 ## 未解決・要検討事項
-- Health Auto ExportのPremium(年額1000円)にするか、Basic買い切り(500円)+手動送信にするか
-  → 手動の場合、送信のたびに日付範囲を広めに取り、UPSERTで穴埋めする運用
+- (解決済み)Premium/Basicの選択 → Basic + Mac自動アップロードで決定(上記参照)
 
 ## 2026/07/25 ダッシュボード(index.html)作成・Kakeibo型で公開へ
 
