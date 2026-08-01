@@ -92,6 +92,17 @@ input, select { font-family: inherit; font-size: 1rem; }
 .insight-item .txt .sub { color: var(--text-sub); font-size: .78rem; }
 .insight-calm { color: var(--ok); font-size: .88rem; }
 .insight-empty { color: var(--text-sub); font-size: .85rem; }
+
+.manual-h2 { font-size: 1.02rem; font-weight: 700; color: var(--brand); margin-bottom: 10px; }
+.manual-steps { margin: 0; padding-left: 20px; }
+.manual-steps li { margin-bottom: 8px; line-height: 1.6; font-size: .92rem; }
+.manual-steps ul { margin: 4px 0 0; padding-left: 18px; }
+.manual-steps ul li { margin-bottom: 2px; font-size: .87rem; color: var(--text-sub); }
+.manual-note { background: var(--brand-light); color: var(--brand); border-radius: 10px; padding: 10px 12px; font-size: .82rem; line-height: 1.6; margin-top: 12px; }
+.manual-warn { background: #fef3c7; color: #92400e; border-radius: 10px; padding: 10px 12px; font-size: .82rem; line-height: 1.6; margin-top: 10px; }
+.manual-qa dt { font-weight: 700; font-size: .88rem; margin-top: 10px; }
+.manual-qa dt:first-child { margin-top: 0; }
+.manual-qa dd { margin: 3px 0 0; font-size: .85rem; color: var(--text-sub); line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -127,7 +138,10 @@ input, select { font-family: inherit; font-size: 1rem; }
 <div id="view-dashboard" class="view">
   <div class="view-header">
     <h1>健康ダッシュボード</h1>
-    <button id="logout-btn" class="btn-ghost">ログアウト</button>
+    <div style="display:flex; gap:4px;">
+      <button id="manual-btn" class="btn-ghost">マニュアル</button>
+      <button id="logout-btn" class="btn-ghost">ログアウト</button>
+    </div>
   </div>
   <div style="font-size:.78rem; color:var(--text-sub); padding:0 2px 10px;">ログイン中: <span id="login-email-display">—</span></div>
 
@@ -165,6 +179,69 @@ input, select { font-family: inherit; font-size: 1rem; }
   <div class="card">
     <div class="chart-wrap"><canvas id="chart"></canvas></div>
     <div class="empty" id="chart-empty" style="display:none">まだデータがありません</div>
+  </div>
+</div>
+
+<!-- マニュアル -->
+<div id="view-manual" class="view">
+  <div class="view-header">
+    <h1>使い方マニュアル</h1>
+    <button id="manual-back-btn" class="btn-ghost">← 戻る</button>
+  </div>
+
+  <div class="card">
+    <div class="manual-h2">① iPhoneからデータを送る</div>
+    <ol class="manual-steps">
+      <li><b>Health Auto Export</b>アプリを開く</li>
+      <li>「<b>手動エクスポート</b>」を選ぶ</li>
+      <li>期間を「<b>過去60日</b>」など広めに設定
+        <ul><li>同じ日を何度送っても上書きされるだけで安全。多めに取っておくのが安心です</li></ul>
+      </li>
+      <li>エクスポート形式は「<b>JSON</b>」、データタイプは「<b>ヘルス指標</b>」のみ
+        <ul><li>「ワークアウト」のチェックは外す(入れると関係ないファイルが大量に混ざります)</li></ul>
+      </li>
+      <li>「健康メトリックを選択」で以下を選ぶ
+        <ul>
+          <li>歩数(検索は「歩数」ではなく「<b>ステップカウント</b>」)</li>
+          <li>心拍数・安静時心拍数・心拍変動</li>
+          <li>歩行速度・歩行の非対称性パーセンテージ・歩行ステップの長さ・歩行ダブルサポート割合</li>
+          <li>睡眠</li>
+        </ul>
+      </li>
+      <li>エクスポートを実行 → 共有メニューが出たら「<b>AirDrop</b>」を選び、このMacに送る</li>
+    </ol>
+    <div class="manual-note">
+      あとは自動です。Macが常に取り込みフォルダを見張っていて、ファイルが届くと数秒でSupabaseに送信されます。何も操作は不要です。
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="manual-h2">② ダッシュボードを見る</div>
+    <ol class="manual-steps">
+      <li>公開URL(ホーム画面に追加しておくと便利です)を開く</li>
+      <li>メールアドレス・パスワードでログイン</li>
+      <li>「最終データ日」でいつのデータまで届いているか確認。チップの色は 緑=最新 / 黄・赤=更新が滞っている合図</li>
+      <li>「注目ポイント」は、直近7日を「普段の自分」と比べて大きく外れている指標があれば表示されます</li>
+      <li>下の指標セレクタで表示するグラフを切り替えられます</li>
+    </ol>
+    <div class="manual-note">
+      「注目ポイント」は体調の目安であり、診断ではありません。気になる場合は医療機関にご相談ください。
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="manual-h2">困ったときは</div>
+    <dl class="manual-qa">
+      <dt>共有メニューに「Supabase」が出てこない</dt>
+      <dd>それで正常です。直接送る機能はないので、必ず「AirDrop」を選んでください。</dd>
+      <dt>「歩数」で検索しても見つからない</dt>
+      <dd>このアプリでは「ステップカウント」という名前で登録されています。</dd>
+      <dt>AirDropで送ったのにダッシュボードに反映されない</dt>
+      <dd>Macがスリープ中・電源オフだと自動アップロードは動きません。Macを開く(起こす)と自動でチェックされます。</dd>
+    </dl>
+    <div class="manual-warn">
+      それでも解決しない場合は、いつもの相談チャットに戻って状況を教えてください。
+    </div>
   </div>
 </div>
 
@@ -287,6 +364,8 @@ $('#logout-btn').addEventListener('click', async () => {
   await sb.auth.signOut();
   showView('login');
 });
+$('#manual-btn').addEventListener('click', () => showView('manual'));
+$('#manual-back-btn').addEventListener('click', () => showView('dashboard'));
 
 sb.auth.onAuthStateChange((event, session) => {
   if (event === 'PASSWORD_RECOVERY') {
