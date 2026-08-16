@@ -126,6 +126,24 @@ Mac: launchd(WatchPaths)が~/Downloadsを監視 → 新しいJSONを検知
 ## 未解決・要検討事項
 - (解決済み)Premium/Basicの選択 → Basic + Mac自動アップロードで決定(上記参照)
 
+## 2026/08/16 launchd自動検知が停止する不具合を修正
+
+数週間安定稼働していた自動アップロードが、ある時から「終了コード78・エラーログ空」で
+毎回失敗するようになった。フルディスクアクセスのON/OFF入れ直しでは直らず。
+
+原因: `StandardOutPath`/`StandardErrorPath`(ログの出力先)を`~/Desktop/HealthDashboard/inbox/`
+配下に置いていたため、**launchdがジョブ起動時にログファイルを作成する処理自体がTCCにブロック**
+されていた。スクリプト本体(`/bin/bash`、既にフルディスクアクセス許可済み)が自力で
+`inbox/upload.log`に書き込む分には問題なかったが、launchdがプロセス起動と同時に行う
+ログファイルのオープンは別経路のため、Desktop配下だと引っかかる。
+
+対処: ログの出力先を`~/Library/Logs/HealthDashboard/`(TCC非対象の標準ログ置き場)に変更。
+`launchd/com.hei86gns.healthdashboard.uploader.plist`を修正し、実機にも再配置・再登録した。
+
+教訓: launchdジョブでDesktop/Documents/Downloads配下のパスを使う場合、スクリプト内部の
+ファイル操作だけでなく、**plistの`StandardOutPath`/`StandardErrorPath`も含めて**
+TCC対象外の場所(`~/Library/Logs/`など)に置くのが安全。
+
 ## 2026/07/25 ダッシュボード(index.html)作成・Kakeibo型で公開へ
 
 「マイアプリ台帳」Artifactで家の全アプリ構成を棚卸しした結果、Kakeibo_Appが

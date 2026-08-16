@@ -16,8 +16,8 @@
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/Users/nori_macbook_air/Desktop/HealthDashboard/inbox/launchd.out.log</string>
+    <string>/Users/nori_macbook_air/Library/Logs/HealthDashboard/launchd.out.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/nori_macbook_air/Desktop/HealthDashboard/inbox/launchd.err.log</string>
+    <string>/Users/nori_macbook_air/Library/Logs/HealthDashboard/launchd.err.log</string>
 </dict>
 </plist>
