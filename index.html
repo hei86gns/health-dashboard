@@ -524,6 +524,12 @@ async function loadMetricOptions() {
   }
   sel.addEventListener('change', () => loadMetricData(sel.value));
   await loadMetricData(names[0]);
+
+  // 一時的なデバッグ表示(sleep_totalが選択肢から消える問題の調査用。消えない)
+  const dbg = document.createElement('div');
+  dbg.style.cssText = 'background:#fee2e2; color:#991b1b; font-size:.72rem; padding:10px; border-radius:8px; margin-bottom:12px; word-break:break-all;';
+  dbg.textContent = 'DEBUG(' + names.length + '件): ' + JSON.stringify(names);
+  sel.closest('.card').after(dbg);
 }
 
 async function loadMetricData(metricName) {
