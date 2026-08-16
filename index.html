@@ -502,7 +502,10 @@ async function loadInsights() {
 function round1(n) { return Math.round(n * 10) / 10; }
 
 async function loadMetricOptions() {
-  const { data, error } = await sb.from('health_metrics').select('metric_name').order('metric_name');
+  // limitを明示しないとSupabaseの既定上限(1000行)で打ち切られ、
+  // データが増えた時にアルファベット順で後ろの指標(sleep_totalなど)が
+  // 選択肢から消えてしまうため、十分大きい値を指定する
+  const { data, error } = await sb.from('health_metrics').select('metric_name').order('metric_name').limit(50000);
   if (error) { showErr('指標一覧の取得に失敗しました（' + error.message + '）'); return; }
 
   const names = [...new Set((data || []).map((r) => r.metric_name))];
