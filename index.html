@@ -502,13 +502,14 @@ async function loadInsights() {
 function round1(n) { return Math.round(n * 10) / 10; }
 
 async function loadMetricOptions() {
-  // limitを明示しないとSupabaseの既定上限(1000行)で打ち切られ、
-  // データが増えた時にアルファベット順で後ろの指標(sleep_totalなど)が
-  // 選択肢から消えてしまうため、十分大きい値を指定する
-  const { data, error } = await sb.from('health_metrics').select('metric_name').order('metric_name').limit(50000);
+  // health_metricsを全件取得して絞り込むと、データが増えた時に
+  // Supabaseのサーバー側行数上限(既定1000行)に引っかかり、
+  // アルファベット順で後ろの指標が欠落する。自分の指標名一覧だけを
+  // 返すRPC(list_metric_names、sql/06)を使うことでこれを回避する。
+  const { data, error } = await sb.rpc('list_metric_names');
   if (error) { showErr('指標一覧の取得に失敗しました（' + error.message + '）'); return; }
 
-  const names = [...new Set((data || []).map((r) => r.metric_name))];
+  const names = (data || []).map((r) => r.metric_name);
   const sel = $('#metric-select');
   sel.innerHTML = '';
   if (names.length === 0) {
@@ -524,12 +525,6 @@ async function loadMetricOptions() {
   }
   sel.addEventListener('change', () => loadMetricData(sel.value));
   await loadMetricData(names[0]);
-
-  // 一時的なデバッグ表示(sleep_totalが選択肢から消える問題の調査用。消えない)
-  const dbg = document.createElement('div');
-  dbg.style.cssText = 'background:#fee2e2; color:#991b1b; font-size:.72rem; padding:10px; border-radius:8px; margin-bottom:12px; word-break:break-all;';
-  dbg.textContent = 'DEBUG(' + names.length + '件): ' + JSON.stringify(names);
-  sel.closest('.card').after(dbg);
 }
 
 async function loadMetricData(metricName) {
