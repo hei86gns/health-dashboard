@@ -103,6 +103,21 @@ input, select { font-family: inherit; font-size: 1rem; }
 .manual-qa dt { font-weight: 700; font-size: .88rem; margin-top: 10px; }
 .manual-qa dt:first-child { margin-top: 0; }
 .manual-qa dd { margin: 3px 0 0; font-size: .85rem; color: var(--text-sub); line-height: 1.6; }
+
+/* ---------- 体組成ビュー ---------- */
+.body-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
+.body-stat { background: var(--card); padding: 12px 14px; }
+.body-stat .num { font-size: 1.25rem; font-weight: 700; color: var(--brand); }
+.body-stat .num .u { font-size: .8rem; font-weight: 600; color: var(--text-sub); margin-left: 2px; }
+.body-stat .lbl { font-size: .72rem; color: var(--text-sub); margin-top: 2px; }
+.body-stat .delta { font-size: .72rem; margin-top: 3px; color: var(--text-sub); }
+.body-stat .delta.good { color: var(--ok); }
+.body-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.body-table { border-collapse: collapse; width: 100%; font-size: .78rem; }
+table.body-table th, table.body-table td { padding: 7px 9px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+table.body-table th { color: var(--text-sub); font-weight: 600; font-size: .72rem; position: sticky; top: 0; background: var(--card); }
+table.body-table th:first-child, table.body-table td:first-child { text-align: left; }
+table.body-table tbody tr:last-child td { border-bottom: none; }
 </style>
 </head>
 <body>
@@ -139,6 +154,7 @@ input, select { font-family: inherit; font-size: 1rem; }
   <div class="view-header">
     <h1>健康ダッシュボード</h1>
     <div style="display:flex; gap:4px;">
+      <button id="body-btn" class="btn-ghost">体組成</button>
       <button id="manual-btn" class="btn-ghost">マニュアル</button>
       <button id="logout-btn" class="btn-ghost">ログアウト</button>
     </div>
@@ -242,6 +258,30 @@ input, select { font-family: inherit; font-size: 1rem; }
     <div class="manual-warn">
       それでも解決しない場合は、いつもの相談チャットに戻って状況を教えてください。
     </div>
+  </div>
+</div>
+
+<!-- 体組成 -->
+<div id="view-body" class="view">
+  <div class="view-header">
+    <h1>体組成</h1>
+    <button id="body-back-btn" class="btn-ghost">← 戻る</button>
+  </div>
+
+  <div class="body-stats" id="body-stats" style="display:none"></div>
+
+  <div class="card">
+    <select id="body-metric-select" class="metric-select"></select>
+  </div>
+
+  <div class="card">
+    <div class="chart-wrap"><canvas id="body-chart"></canvas></div>
+    <div class="empty" id="body-chart-empty" style="display:none">体組成データがまだありません</div>
+  </div>
+
+  <div class="card">
+    <div class="label" style="font-size:.78rem; color:var(--text-sub); margin-bottom:8px;">全測定データ</div>
+    <div class="body-table-wrap"><table class="body-table" id="body-table"></table></div>
   </div>
 </div>
 
@@ -366,6 +406,8 @@ $('#logout-btn').addEventListener('click', async () => {
 });
 $('#manual-btn').addEventListener('click', () => showView('manual'));
 $('#manual-back-btn').addEventListener('click', () => showView('dashboard'));
+$('#body-btn').addEventListener('click', openBodyView);
+$('#body-back-btn').addEventListener('click', () => showView('dashboard'));
 
 sb.auth.onAuthStateChange((event, session) => {
   if (event === 'PASSWORD_RECOVERY') {
@@ -567,6 +609,155 @@ function renderChart(rows, metricName) {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: true } },
+    },
+  });
+}
+
+/* ============================================================
+ * 体組成（body_composition テーブル / RLSで本人の行のみ）
+ * ============================================================ */
+// 列 → 表示名・単位・小数桁。表とグラフのセレクタで共通利用。
+const BODY_METRICS = [
+  { key: 'weight',           name: '体重',           unit: 'kg',   dp: 1, goodDir: 0  },
+  { key: 'body_fat_pct',     name: '体脂肪率',       unit: '%',    dp: 1, goodDir: -1 },
+  { key: 'fat_mass',         name: '脂肪量',         unit: 'kg',   dp: 1, goodDir: -1 },
+  { key: 'lean_mass',        name: '除脂肪量',       unit: 'kg',   dp: 1, goodDir: 1  },
+  { key: 'muscle_mass',      name: '筋肉量',         unit: 'kg',   dp: 1, goodDir: 1  },
+  { key: 'body_water',       name: '水分量',         unit: 'kg',   dp: 1, goodDir: 0  },
+  { key: 'protein',          name: 'タンパク質など', unit: 'kg',   dp: 1, goodDir: 0  },
+  { key: 'bmi',              name: 'BMI',            unit: '',     dp: 1, goodDir: 0  },
+  { key: 'bmr',              name: '基礎代謝量',     unit: 'kcal', dp: 0, goodDir: 1  },
+  { key: 'visceral_fat',     name: '内臓脂肪レベル', unit: '',     dp: 0, goodDir: -1 },
+  { key: 'athlete_index',    name: 'アスリート指数', unit: '',     dp: 0, goodDir: 1  },
+  { key: 'leg_muscle_score', name: '脚部筋肉判定',   unit: '点',   dp: 0, goodDir: 1  },
+];
+// サマリータイルに出す代表4項目
+const BODY_TILE_KEYS = ['weight', 'body_fat_pct', 'muscle_mass', 'bmr'];
+
+let bodyRows = null;   // 取得済みデータ（measured_date 昇順）
+let bodyChart = null;
+let bodyLoaded = false;
+
+async function openBodyView() {
+  showView('body');
+  if (!bodyLoaded) await loadBodyComposition();
+}
+
+async function loadBodyComposition() {
+  const { data, error } = await sb
+    .from('body_composition')
+    .select('*')
+    .order('measured_date', { ascending: true });
+  if (error) { showErr('体組成データの取得に失敗しました（' + error.message + '）'); return; }
+
+  bodyRows = data || [];
+  bodyLoaded = true;
+
+  // セレクタを組み立て（初回のみ）
+  const sel = $('#body-metric-select');
+  if (!sel.dataset.built) {
+    sel.innerHTML = BODY_METRICS.map((m) => `<option value="${m.key}">${m.name}</option>`).join('');
+    sel.addEventListener('change', () => renderBodyChart(sel.value));
+    sel.dataset.built = '1';
+  }
+
+  renderBodyStats();
+  renderBodyTable();
+  renderBodyChart(sel.value || 'weight');
+}
+
+function fmtBodyDate(s) { const [y, m, d] = s.split('-'); return `${y}/${m}/${d}`; }
+
+function renderBodyStats() {
+  const wrap = $('#body-stats');
+  if (!bodyRows || bodyRows.length === 0) { wrap.style.display = 'none'; return; }
+  const first = bodyRows[0], last = bodyRows[bodyRows.length - 1];
+  wrap.style.display = 'grid';
+  wrap.innerHTML = BODY_TILE_KEYS.map((key) => {
+    const m = BODY_METRICS.find((x) => x.key === key);
+    const cur = last[key], base = first[key];
+    const diff = (cur != null && base != null) ? (cur - base) : null;
+    let deltaHtml = '';
+    if (diff != null) {
+      const sign = diff > 0 ? '+' : '';
+      const good = m.goodDir !== 0 && Math.sign(diff) === m.goodDir;
+      deltaHtml = `<div class="delta ${good ? 'good' : ''}">開始比 ${sign}${diff.toFixed(m.dp)} ${m.unit}</div>`;
+    }
+    const val = cur != null ? Number(cur).toFixed(m.dp) : '—';
+    return `<div class="body-stat">
+      <div class="num">${val}<span class="u">${m.unit}</span></div>
+      <div class="lbl">${m.name}（最新）</div>
+      ${deltaHtml}
+    </div>`;
+  }).join('');
+}
+
+function renderBodyTable() {
+  const tbl = $('#body-table');
+  if (!bodyRows || bodyRows.length === 0) { tbl.innerHTML = ''; return; }
+  const head = '<thead><tr><th>測定日</th>' +
+    BODY_METRICS.map((m) => `<th>${m.name}${m.unit ? '(' + m.unit + ')' : ''}</th>`).join('') +
+    '</tr></thead>';
+  // 新しい順で見せる（最新が上）
+  const rowsDesc = bodyRows.slice().reverse();
+  const body = '<tbody>' + rowsDesc.map((r) => '<tr><td>' + fmtBodyDate(r.measured_date) + '</td>' +
+    BODY_METRICS.map((m) => {
+      const v = r[m.key];
+      return `<td>${v == null ? '—' : Number(v).toFixed(m.dp)}</td>`;
+    }).join('') + '</tr>').join('') + '</tbody>';
+  tbl.innerHTML = head + body;
+}
+
+function renderBodyChart(metricKey) {
+  const m = BODY_METRICS.find((x) => x.key === metricKey) || BODY_METRICS[0];
+  const empty = $('#body-chart-empty');
+  const canvas = $('#body-chart');
+  const pts = (bodyRows || []).filter((r) => r[m.key] != null);
+  if (pts.length === 0) {
+    empty.style.display = 'block';
+    canvas.style.display = 'none';
+    if (bodyChart) { bodyChart.destroy(); bodyChart = null; }
+    return;
+  }
+  empty.style.display = 'none';
+  canvas.style.display = 'block';
+
+  const labels = pts.map((r) => r.measured_date.slice(5)); // MM-DD
+  const values = pts.map((r) => Number(r[m.key]));
+
+  if (bodyChart) bodyChart.destroy();
+  bodyChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: m.name,
+        data: values,
+        borderColor: '#1a5c4a',
+        backgroundColor: 'rgba(26,92,74,.12)',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointBackgroundColor: '#fff',
+        pointBorderColor: '#1a5c4a',
+        pointBorderWidth: 2,
+        tension: 0.25,
+        fill: true,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => fmtBodyDate(pts[items[0].dataIndex].measured_date),
+            label: (item) => `${m.name} ${Number(item.raw).toFixed(m.dp)}${m.unit}`,
+          },
+        },
+      },
+      // 体重などは0始まりだと変化が見えないので自動スケール
+      scales: { y: { beginAtZero: false } },
     },
   });
 }
