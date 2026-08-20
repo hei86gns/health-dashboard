@@ -246,6 +246,28 @@ table.body-table tbody tr:last-child td { border-bottom: none; }
   </div>
 
   <div class="card">
+    <div class="manual-h2">③ 体組成を更新する（月イチ・ジムの測定後）</div>
+    <ol class="manual-steps">
+      <li>ジムでもらった体組成計のプリント(PDFか写真)を、パソコンのDrive内フォルダ<b>「ジム測定記録」</b>に入れる
+        <ul><li>ファイル名は「ジム測定記録」＋年月。例：<b>ジム測定記録202608</b>（202608＝2026年8月）</li></ul>
+      </li>
+      <li><b>Cowork(Claudeアプリ)</b>で新しいチャットを開き、「Add folder」でその「ジム測定記録」フォルダをつなぐ</li>
+      <li>「<b>ジム測定記録を更新して</b>」と送る
+        <ul><li>増えた分だけ自動で読み取り、表・グラフの更新と、反映用のファイル<b>body_composition_upsert_◯◯.sql</b>が出てくる</li></ul>
+      </li>
+      <li>その<b>.sqlファイルの中身をコピー</b> → <b>Supabase</b>の画面(左メニュー「SQL Editor」)に貼って<b>Run</b>で実行</li>
+      <li>このアプリの<b>「体組成」</b>を開くと、最新月が反映されている</li>
+    </ol>
+    <div class="manual-note">
+      SQLは何度実行しても同じ測定日は上書きされるだけなので、間違えて2回流しても重複しません。
+      Torelog(筋トレアプリ)の設定画面からも、このアプリの体組成へリンクで飛べます。
+    </div>
+    <div class="manual-warn">
+      いちばん最初の1回だけ、体組成の入れ物(テーブル)を作るSQL(セットアップ用の 01→02)を先に実行しておく必要があります(一度きり)。作成済みなら以降は上の手順だけでOK。
+    </div>
+  </div>
+
+  <div class="card">
     <div class="manual-h2">困ったときは</div>
     <dl class="manual-qa">
       <dt>共有メニューに「Supabase」が出てこない</dt>
@@ -254,6 +276,10 @@ table.body-table tbody tr:last-child td { border-bottom: none; }
       <dd>このアプリでは「ステップカウント」という名前で登録されています。</dd>
       <dt>AirDropで送ったのにダッシュボードに反映されない</dt>
       <dd>Macがスリープ中・電源オフだと自動アップロードは動きません。Macを開く(起こす)と自動でチェックされます。</dd>
+      <dt>「体組成」に新しい月が出てこない</dt>
+      <dd>体組成はiPhoneからの自動送信ではなく、③の手順(SupabaseでSQLを実行)で入ります。SQLを実行したか、ログイン中のメールとSQL内のメール(heihachiro3@gmail.com)が一致しているかを確認してください。</dd>
+      <dt>SupabaseのSQL Editorの場所が分からない</dt>
+      <dd>Supabaseにログイン → 対象プロジェクトを開く → 左メニューの「SQL Editor」。そこに.sqlの中身を貼って「Run」で実行します。</dd>
     </dl>
     <div class="manual-warn">
       それでも解決しない場合は、いつもの相談チャットに戻って状況を教えてください。
