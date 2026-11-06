@@ -7,7 +7,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/nori_macbook_air/Desktop/HealthDashboard/scripts/upload_export.sh</string>
+        <string>/Users/nori_macbook_air/Dev/HealthDashboard/scripts/upload_export.sh</string>
     </array>
     <key>WatchPaths</key>
     <array>
